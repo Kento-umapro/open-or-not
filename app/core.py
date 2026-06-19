@@ -5,7 +5,7 @@ import jpholiday
 
 from .database import SessionLocal
 from .models import Store, OpenReport, CloseReport
-from .line_client import push_text
+from .line_client import push_text, line_enabled
 
 JST = ZoneInfo("Asia/Tokyo")
 GRACE_MINUTES = 15          # 開店時刻から何分過ぎたらアラートするか
@@ -121,35 +121,43 @@ def is_overdue(store: Store, d: date = None) -> bool:
     return n >= deadline
 
 
-def check_unopened():
-    """開店時刻＋猶予を過ぎても未オープンの店を見つけて、1日1回だけ管理者へLINE通知。"""
+def check_unopened(force: bool = False):
+    """開店時刻＋猶予を過ぎても未オープンの店を見つけて管理者へLINE通知。
+    送信に成功した時だけ当日フラグを立てる（鍵未設定/失敗時は次回再送される）。
+    force=True で「当日アラート済み」「深夜カットオフ」を無視して即実行（テスト用）。
+    結果サマリを返す。"""
     db = SessionLocal()
+    summary = {"now": "", "line": line_enabled(),
+               "overdue": [], "sent": [], "failed": [], "skipped_cutoff": False}
     try:
         n = now_jst()
-        if n.hour >= ALERT_CUTOFF_HOUR:
-            return
+        summary["now"] = n.strftime("%m/%d %H:%M")
+        if not force and n.hour >= ALERT_CUTOFF_HOUR:
+            summary["skipped_cutoff"] = True
+            return summary
         td = n.date()
-        overdue = []
         for store in db.query(Store).all():
-            if store.alerted_on == td:
+            if not force and store.alerted_on == td:
                 continue
             if todays_open_time(store, td) is None:   # 本日休業はスキップ
                 continue
-            if get_today_open(db, store.id):
+            if get_today_open(db, store.id):           # もう報告済み
                 continue
-            if is_overdue(store, td):
-                overdue.append(store)
-
-        for store in overdue:
+            if not is_overdue(store, td):              # まだ開店前 or 猶予内
+                continue
+            summary["overdue"].append(store.name)
             ot = todays_open_time(store, td) or ""
             ok = push_text(
                 f"🔴 未オープンアラート\n{store.name} が開店予定 {ot} を"
                 f"{GRACE_MINUTES}分過ぎても報告がありません。\n（{n.strftime('%m/%d %H:%M')} 時点）"
             )
-            # 通知できた／LINE未設定どちらでも当日フラグは立てて重複連投を防ぐ
-            store.alerted_on = td
-            db.add(store)
-        if overdue:
-            db.commit()
+            if ok:
+                summary["sent"].append(store.name)
+                store.alerted_on = td               # 成功時のみ重複防止フラグ
+                db.add(store)
+            else:
+                summary["failed"].append(store.name)
+        db.commit()
+        return summary
     finally:
         db.close()

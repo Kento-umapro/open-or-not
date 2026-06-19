@@ -19,7 +19,7 @@ from .models import Store, OpenReport, CloseReport
 from . import core
 from .seed import seed_if_empty
 from .cloudinary_client import upload_image, cloudinary_enabled
-from .line_client import line_enabled
+from .line_client import line_enabled, push_detail
 
 BASE_DIR = os.path.dirname(__file__)
 app = FastAPI(title="どてっぱん オープンチェック")
@@ -353,11 +353,39 @@ def admin_today(request: Request, db: Session = Depends(get_db)):
     return {"date": core.today_jst().strftime("%Y/%m/%d"), "now": core.now_jst().strftime("%H:%M"), "stores": out}
 
 
+# ---------- 診断用（本部・要ログイン） ----------
+@app.get("/admin/test-line")
+def admin_test_line(request: Request):
+    """LINEへテスト通知を1通送って、結果（成功/失敗の理由）をその場で返す。"""
+    if not admin_authed(request):
+        raise HTTPException(403, "本部ログインが必要です")
+    ok, detail = push_detail(
+        f"✅ テスト通知（どてっぱん オープンチェック）\n"
+        f"この通知が届いていれば設定はOKです。\n（{core.now_jst().strftime('%m/%d %H:%M')}）"
+    )
+    return JSONResponse({
+        "line_enabled": line_enabled(),
+        "sent": ok,
+        "detail": detail,
+        "hint": "sent=true なら西村さんのLINEに届いているはずです。届かない/falseの場合は detail を確認してください。",
+    })
+
+
+@app.get("/admin/run-check")
+def admin_run_check(request: Request):
+    """未オープンチェックを今すぐ強制実行（当日アラート済み・深夜カットオフを無視）。
+    今まさに開店時刻を過ぎて未報告の店があれば、即LINE送信して結果を返す。"""
+    if not admin_authed(request):
+        raise HTTPException(403, "本部ログインが必要です")
+    summary = core.check_unopened(force=True)
+    return JSONResponse(summary)
+
+
 # Railway Cron からも叩けるように（任意）
 @app.post("/cron/check-unopened")
 def cron_check():
-    core.check_unopened()
-    return {"ok": True}
+    summary = core.check_unopened()
+    return {"ok": True, "summary": summary}
 
 
 @app.get("/healthz")
