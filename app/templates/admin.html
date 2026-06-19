@@ -36,11 +36,11 @@
     <div class="clock"><a href="/admin" style="color:var(--ember-soft);text-decoration:none;font-weight:700;margin-right:12px">← 🗾 マップに戻る</a><a href="/logout" style="color:var(--ink-dim);text-decoration:none;margin-right:12px">ログアウト</a><span id="date"></span>　更新 <span id="now"></span></div>
   </div>
   <div class="grid" id="grid"></div>
-  <div class="legend">60秒ごとに自動更新／<span style="color:var(--red)">赤</span>＝開店時刻を過ぎても未オープン</div>
+  <div class="legend">60秒ごとに自動更新／<span style="color:var(--red)">赤</span>＝開店時刻を過ぎても未報告</div>
 </div>
 
 <script>
-const STATE = { unopened:"未オープン", open:"営業中", closed:"閉店" };
+const STATE = { unopened:"未報告", open:"営業中", closed:"閉店" };
 
 async function load(){
   const r = await fetch("/api/admin/today");
@@ -53,7 +53,7 @@ async function load(){
     const overdue = s.overdue;
     const cls = s.status + (overdue ? " overdue":"");
     const pillCls = overdue ? "overdue" : s.status;
-    const pillTxt = overdue ? "未オープン！" : STATE[s.status];
+    const pillTxt = overdue ? "未報告！" : STATE[s.status];
     let meta = "開店予定 " + s.open_time;
     if(s.opened_at) meta = s.opened_at + " オープン";
     if(s.closed_at) meta = s.opened_at + "〜" + s.closed_at;

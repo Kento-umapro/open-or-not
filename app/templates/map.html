@@ -39,7 +39,7 @@ border-left:4px solid var(--line);border-radius:10px;padding:9px 10px}
     <div class="card"><h2>全国マップ</h2><div id="map"></div>
       <div class="legend">
         <span><i style="background:var(--green)"></i>営業中</span>
-        <span><i style="background:#5a4a3a"></i>未オープン</span>
+        <span><i style="background:#5a4a3a"></i>未報告</span>
         <span><i style="background:var(--red)"></i>超過</span>
         <span><i style="background:var(--slate)"></i>閉店</span>
       </div>
@@ -55,7 +55,7 @@ border-left:4px solid var(--line);border-radius:10px;padding:9px 10px}
 </div>
 <script>
 const COL={open:"#2bd083",unopened:"#5a4a3a",overdue:"#e23b2e",closed:"#7d8a96"};
-const TXT={open:"営業中",unopened:"未オープン",overdue:"超過・未報告",closed:"閉店"};
+const TXT={open:"営業中",unopened:"未報告",overdue:"超過・未報告",closed:"閉店"};
 const nm=n=>n;   // マップのピンはフル店名で表示（「店」も付ける）
 let MD=null;
 

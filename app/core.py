@@ -8,8 +8,9 @@ from .models import Store, OpenReport, CloseReport
 from .line_client import push_text, line_enabled
 
 JST = ZoneInfo("Asia/Tokyo")
-GRACE_MINUTES = 15          # 開店時刻から何分過ぎたらアラートするか
+GRACE_MINUTES = 0           # 0=開店時刻ちょうどで判定（猶予なし・ジャストタイム）
 ALERT_CUTOFF_HOUR = 23      # 深夜にアラートを送らないための上限
+RESET_HOUR = 9              # 毎朝この時刻に全店「未報告」へ戻す（＝営業日の境目）
 
 # ───────────────────────────────────────────────────────────────
 # 店舗ごとの開店スケジュール（曜日・祝日で切替）
@@ -44,6 +45,17 @@ def today_jst() -> date:
     return now_jst().date()
 
 
+def business_date(dt: datetime = None) -> date:
+    """営業日の日付。朝9時(RESET_HOUR)を境にする＝9時前は前日扱い。
+    これにより毎朝9時に全店が自動で「未報告」に戻り、
+    翌4時閉店などの深夜営業も0時で勝手にリセットされない。"""
+    n = dt or now_jst()
+    d = n.date()
+    if n.hour < RESET_HOUR:
+        d = d - timedelta(days=1)
+    return d
+
+
 def day_kind(d: date) -> str:
     """その日が weekday / saturday / sunday / holiday のどれか（祝日優先）。"""
     if jpholiday.is_holiday(d):
@@ -62,7 +74,7 @@ def schedule_for(store: Store) -> dict:
 
 def todays_open_time(store: Store, d: date = None):
     """その日の開店時刻 "HH:MM"。休業日は None。"""
-    d = d or today_jst()
+    d = d or business_date()
     return schedule_for(store).get(day_kind(d))
 
 
@@ -75,7 +87,7 @@ def open_time_label(store: Store, d: date = None) -> str:
 def get_today_open(db, store_id: int):
     return (
         db.query(OpenReport)
-        .filter(OpenReport.store_id == store_id, OpenReport.report_date == today_jst())
+        .filter(OpenReport.store_id == store_id, OpenReport.report_date == business_date())
         .first()
     )
 
@@ -83,7 +95,7 @@ def get_today_open(db, store_id: int):
 def get_today_close(db, store_id: int):
     return (
         db.query(CloseReport)
-        .filter(CloseReport.store_id == store_id, CloseReport.report_date == today_jst())
+        .filter(CloseReport.store_id == store_id, CloseReport.report_date == business_date())
         .first()
     )
 
@@ -135,7 +147,7 @@ def check_unopened(force: bool = False):
         if not force and n.hour >= ALERT_CUTOFF_HOUR:
             summary["skipped_cutoff"] = True
             return summary
-        td = n.date()
+        td = business_date(n)
         for store in db.query(Store).all():
             if not force and store.alerted_on == td:
                 continue
@@ -148,8 +160,8 @@ def check_unopened(force: bool = False):
             summary["overdue"].append(store.name)
             ot = todays_open_time(store, td) or ""
             ok = push_text(
-                f"🔴 未オープンアラート\n{store.name} が開店予定 {ot} を"
-                f"{GRACE_MINUTES}分過ぎても報告がありません。\n（{n.strftime('%m/%d %H:%M')} 時点）"
+                f"🔴 未オープンアラート\n{store.name} が開店時刻 {ot} になりましたが、"
+                f"まだオープン報告がありません。\n（{n.strftime('%m/%d %H:%M')} 時点）"
             )
             if ok:
                 summary["sent"].append(store.name)

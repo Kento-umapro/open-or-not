@@ -44,7 +44,7 @@
   {% if status == "unopened" %}
     <div class="status unopened" id="statusBand">
       <div class="label">本日のステータス</div>
-      <div class="state">未オープン</div>
+      <div class="state">未報告</div>
       <div class="sub">開店予定 {{ today_open }}</div>
     </div>
 
@@ -133,7 +133,7 @@
     <div class="ssMap" id="ssMap"></div>
     <div class="ssLegend">
       <span><i style="background:#2bd083"></i>営業中</span>
-      <span><i style="background:#5a4a3a"></i>未オープン</span>
+      <span><i style="background:#5a4a3a"></i>未報告</span>
       <span><i style="background:#e23b2e"></i>超過</span>
       <span><i style="background:#7d8a96"></i>閉店</span>
     </div>
@@ -157,7 +157,7 @@
 (function(){
   const SID=document.body.dataset.store, TOK=document.body.dataset.token;
   const COL={open:"#2bd083",unopened:"#5a4a3a",overdue:"#e23b2e",closed:"#7d8a96"};
-  const TXT={open:"営業中",unopened:"未オープン",overdue:"超過・未報告",closed:"閉店"};
+  const TXT={open:"営業中",unopened:"未報告",overdue:"超過・未報告",closed:"閉店"};
   const eff=s=>(s.status==="unopened"&&s.overdue)?"overdue":s.status;
   let MD=null;
 

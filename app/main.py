@@ -77,7 +77,7 @@ def startup():
     seed_if_empty()
     _backfill_tokens()
     # 未オープンチェックを5分おきに実行
-    scheduler.add_job(core.check_unopened, "interval", minutes=5, id="check_unopened",
+    scheduler.add_job(core.check_unopened, "interval", minutes=1, id="check_unopened",
                       replace_existing=True)
     scheduler.start()
     print(f"Cloudinary: {'ON' if cloudinary_enabled() else 'local fallback'} | "
@@ -152,7 +152,7 @@ def store_app(store_id: int, token: str, request: Request, db: Session = Depends
         "store": store,
         "token": token,
         "status": status,
-        "today": core.today_jst().strftime("%Y/%m/%d (%a)"),
+        "today": core.business_date().strftime("%Y/%m/%d (%a)"),
         "today_open": core.open_time_label(store),
         "opened_at": open_rep.opened_at.strftime("%H:%M") if open_rep else None,
         "closed_at": close_rep.closed_at.strftime("%H:%M") if close_rep else None,
@@ -202,7 +202,7 @@ async def submit_open(
 
     rep = OpenReport(
         store_id=store_id,
-        report_date=core.today_jst(),
+        report_date=core.business_date(),
         opened_at=core.now_jst().replace(tzinfo=None),
         reporter=reporter.strip() or None,
         memo=memo.strip() or None,
@@ -236,7 +236,7 @@ async def submit_close(
 
     rep = CloseReport(
         store_id=store_id,
-        report_date=core.today_jst(),
+        report_date=core.business_date(),
         closed_at=core.now_jst().replace(tzinfo=None),
         reporter=reporter.strip() or None,
         handover=handover.strip() or None,
@@ -267,7 +267,7 @@ def store_today_api(store_id: int, token: str, request: Request, db: Session = D
             "status": status,
             "overdue": status == "unopened" and core.is_overdue(s),
         })
-    return {"date": core.today_jst().strftime("%Y/%m/%d"),
+    return {"date": core.business_date().strftime("%Y/%m/%d"),
             "now": core.now_jst().strftime("%H:%M"), "stores": out}
 
 
@@ -350,7 +350,7 @@ def admin_today(request: Request, db: Session = Depends(get_db)):
             "handover": close_rep.handover if close_rep else None,
             "close_photos": close_rep.photos if close_rep else [],
         })
-    return {"date": core.today_jst().strftime("%Y/%m/%d"), "now": core.now_jst().strftime("%H:%M"), "stores": out}
+    return {"date": core.business_date().strftime("%Y/%m/%d"), "now": core.now_jst().strftime("%H:%M"), "stores": out}
 
 
 # ---------- 診断用（本部・要ログイン） ----------
