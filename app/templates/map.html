@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>全店ステータスマップ｜どてっぱん</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+.wrap{max-width:1080px}
+.head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.head h1{font-size:20px;margin:0;font-weight:800}
+.kpi{font-size:14px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.kpi b{color:var(--green-soft);font-size:26px;font-weight:800}
+.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}
+@media(max-width:780px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+.card h2{font-size:12px;letter-spacing:.16em;color:var(--ink-dim);margin:2px 4px 10px;font-weight:700}
+svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-dim);margin:10px 4px 0}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
+.grp{margin-bottom:14px}.grp h3{font-size:12px;color:var(--ink-dim);margin:0 4px 7px;letter-spacing:.08em}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chip{display:flex;align-items:center;gap:9px;background:var(--panel-2);border:1px solid var(--line);
+border-left:4px solid var(--line);border-radius:10px;padding:9px 10px}
+.chip .nm{font-size:13px;font-weight:700;line-height:1.2}.chip .tm{font-size:11px;color:var(--ink-dim);margin-top:1px}
+.chip.s-open{border-left-color:var(--green)}.chip.s-unopened{border-left-color:#5a4a3a;opacity:.72}
+.chip.s-overdue{border-left-color:var(--red);background:#2a1512}.chip.s-closed{border-left-color:var(--slate)}
+.led{width:12px;height:12px;border-radius:50%;flex:none}
+.s-open .led{background:var(--green-soft);box-shadow:0 0 11px 1px rgba(43,208,131,.75)}
+.s-unopened .led{background:#5a4a3a}.s-overdue .led{background:var(--red);box-shadow:0 0 11px 1px rgba(226,59,46,.85)}
+.s-closed .led{background:var(--slate)}
+.pulse{animation:pl 1.3s ease-in-out infinite}@keyframes pl{50%{opacity:.5}}
+.back{display:inline-block;margin-top:14px;color:var(--ember-soft);text-decoration:none;font-weight:700}
+</style></head><body>
+<div class="wrap">
+  <div class="head">
+    <h1>全店ステータスマップ</h1>
+    <div class="kpi"><span id="clock"></span>　本日オープン <b id="oc">–</b>/<span id="total">–</span></div>
+  </div>
+  <div class="grid">
+    <div class="card"><h2>全国マップ</h2><div id="map"></div>
+      <div class="legend">
+        <span><i style="background:var(--green)"></i>営業中</span>
+        <span><i style="background:#5a4a3a"></i>未オープン</span>
+        <span><i style="background:var(--red)"></i>超過</span>
+        <span><i style="background:var(--slate)"></i>閉店</span>
+      </div>
+    </div>
+    <div class="card"><h2>店舗一覧</h2>
+      <div class="grp"><h3>首都圏</h3><div class="chips" id="g-kanto"></div></div>
+      <div class="grp"><h3>その他エリア</h3><div class="chips" id="g-nat"></div></div>
+      <div class="grp" id="grp-other" style="display:none"><h3>その他</h3><div class="chips" id="g-other"></div></div>
+    </div>
+  </div>
+  <a class="back" href="/admin/list">📋 詳細一覧（写真・引き継ぎ）→</a>
+  <a class="back" href="/logout" style="margin-left:16px" onclick="return confirm('本部からログアウトしますか？')">ログアウト</a>
+</div>
+<script>
+const COL={open:"#2bd083",unopened:"#5a4a3a",overdue:"#e23b2e",closed:"#7d8a96"};
+const TXT={open:"営業中",unopened:"未オープン",overdue:"超過・未報告",closed:"閉店"};
+const nm=n=>n.replace("店","").replace("駅前","");
+let MD=null;
+
+async function init(){
+  MD=await (await fetch("/static/mapdata.json")).json();
+  await tick(); setInterval(tick, 180000); // 3分ごと
+}
+function effStatus(s){ return (s.status==="unopened" && s.overdue) ? "overdue" : s.status; }
+
+async function tick(){
+  const d=await (await fetch("/api/admin/today")).json();
+  const KANTO=Object.keys(MD.meta).filter(n=>MD.meta[n].region==="kanto");
+  const NATS=Object.keys(MD.meta).filter(n=>MD.meta[n].region==="nat");
+  const stat={}; d.stores.forEach(s=>stat[s.name]=effStatus(s));
+  const ALLN=Object.keys(MD.stores);
+
+  // ---- map ----
+  const W=MD.W,H=MD.H; let s=`<svg viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#15110d"/>`;
+  MD.paths.forEach(p=>s+=`<path d="${p}" fill="#3a2e22" stroke="#52412f" stroke-width="0.5"/>`);
+  ALLN.forEach(n=>{ const [x,y]=MD.stores[n]; const st=stat[n]||"unopened"; const c=COL[st];
+    const glow=(st==="open"||st==="overdue");
+    if(MD.anchors && MD.anchors[n]){ const [ax,ay]=MD.anchors[n]; const side=MD.anchorSide[n]; const tx=ax+(side==="start"?16:-16);
+      s+=`<g><circle cx="${x}" cy="${y}" r="4" fill="${c}"/>
+        <line x1="${x}" y1="${y}" x2="${ax}" y2="${ay}" stroke="#52412f" stroke-width="1.3"/>
+        ${glow?`<circle cx="${ax}" cy="${ay}" r="28" fill="${c}" opacity="${st==='overdue'?0.28:0.2}" class="${st==='overdue'?'pulse':''}"/>`:""}
+        <circle cx="${ax}" cy="${ay}" r="11" fill="${c}" stroke="#15110d" stroke-width="2.5"/>
+        <text x="${tx}" y="${ay+6}" text-anchor="${side}" font-size="22" font-weight="700" fill="#f7efe6"
+          paint-order="stroke" stroke="#15110d" stroke-width="4">${nm(n)}</text></g>`;
+    } else { const [dx,dy,a]=(MD.labels[n]||[14,5,"start"]); const tf=st==="unopened"?"#b8a795":"#f7efe6";
+      s+=`<g>${glow?`<circle cx="${x}" cy="${y}" r="28" fill="${c}" opacity="${st==='overdue'?0.28:0.2}" class="${st==='overdue'?'pulse':''}"/>`:""}
+        <circle cx="${x}" cy="${y}" r="11" fill="${c}" stroke="#15110d" stroke-width="2.5"/>
+        <text x="${x+dx}" y="${y+dy}" text-anchor="${a}" font-size="22" font-weight="700" fill="${tf}"
+          paint-order="stroke" stroke="#15110d" stroke-width="4">${nm(n)}</text></g>`; }});
+  s+=`</svg>`;
+  document.getElementById("map").innerHTML=s;
+
+  // ---- lists ----
+  const chip=n=>{const st=stat[n]||"unopened";return `<div class="chip s-${st}">
+    <span class="led"></span><div><div class="nm">${n}</div><div class="tm">${TXT[st]}</div></div></div>`;};
+  document.getElementById("g-kanto").innerHTML=KANTO.map(chip).join("");
+  document.getElementById("g-nat").innerHTML=NATS.map(chip).join("");
+  const known=new Set([...KANTO,...NATS]);
+  const others=d.stores.map(s=>s.name).filter(n=>!known.has(n));
+  if(others.length){document.getElementById("grp-other").style.display="block";
+    document.getElementById("g-other").innerHTML=others.map(chip).join("");}
+
+  const on=d.stores.filter(s=>s.status==="open"||s.status==="closed").length;
+  document.getElementById("oc").textContent=on;
+  document.getElementById("total").textContent=d.stores.length;
+  document.getElementById("clock").textContent=d.date+" "+d.now;
+}
+init();
+</script></body></html>

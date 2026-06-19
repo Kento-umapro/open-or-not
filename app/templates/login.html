@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<title>{{ title }}</title>
+<style>
+.box{margin-top:50px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px 22px;text-align:center}
+.box .ico{font-size:40px}.box h1{font-size:20px;margin:10px 0 4px}.box p{color:var(--ink-dim);font-size:13px;margin:0 0 18px}
+.box input{width:100%;text-align:center;font-size:30px;letter-spacing:.4em;background:var(--panel-2);
+border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:16px;font-family:inherit}
+.box input:focus{outline:2px solid var(--ember)}
+.box button{width:100%;margin-top:14px;border:none;border-radius:14px;padding:18px;font-size:18px;font-weight:800;
+color:#fff;background:linear-gradient(180deg,var(--ember-soft),var(--ember));cursor:pointer;font-family:inherit}
+.err{color:var(--red);font-size:14px;margin-top:12px;min-height:20px}
+</style></head><body><div class="wrap">
+  <div class="box">
+    <div class="ico">🔐</div>
+    <h1>{{ title }}</h1>
+    <p>{{ subtitle }}</p>
+    <input id="pc" type="password" inputmode="numeric" autocomplete="off" placeholder="認識コード" autofocus
+      onkeydown="if(event.key==='Enter')go()">
+    <button onclick="go()">開始</button>
+    <div class="err" id="err"></div>
+  </div>
+  <a href="/" style="display:block;text-align:center;margin-top:18px;color:var(--ink-dim);font-size:13px;text-decoration:none">← トップに戻る（店舗を選び直す）</a>
+</div>
+<script>
+async function go(){
+  const pc=document.getElementById("pc").value.trim();
+  const fd=new FormData(); fd.append("passcode",pc);
+  const r=await fetch("{{ action }}",{method:"POST",body:fd});
+  const d=await r.json().catch(()=>({}));
+  if(d.ok){ location.href=d.redirect; }
+  else{ document.getElementById("err").textContent="認識コードが違います"; 
+        document.getElementById("pc").value=""; document.getElementById("pc").focus(); }
+}
+</script></body></html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<title>どてっぱん オープンチェック</title>
+<style>
+.lead{color:var(--ink-dim);font-size:13px;line-height:1.7;margin:4px 4px 16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cardlink{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);
+ border-radius:14px;padding:14px;color:var(--ink);text-decoration:none}
+.cardlink:active{transform:translateY(1px)}
+.num{flex:none;width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+ font-size:24px;font-weight:900;background:var(--panel-2);border:1px solid var(--line);color:var(--ember-soft)}
+.cardlink .nm{font-size:15px;font-weight:700;line-height:1.25}
+.cardlink .sub{font-size:11px;color:var(--ink-dim);margin-top:2px}
+.hq{grid-column:1 / -1;border-color:var(--ember);} .hq .num{color:#15110d;background:var(--ember-soft);border-color:var(--ember)}
+.note{color:var(--ink-dim);font-size:12px;margin-top:16px;line-height:1.6}
+</style></head><body><div class="wrap">
+  <div class="top"><div class="store-name">どてっぱん オープンチェック</div></div>
+  <p class="lead">自分の店をタップ。ログイン済みの端末はそのまま開きます。<br>
+  初回・またはしばらく開いていないときは、下の<b>番号（認識コード）</b>を入力してください。</p>
+  <div class="grid">
+    <a class="cardlink hq" href="/admin">
+      <span class="num">0</span><div><div class="nm">本部・全店ステータス</div><div class="sub">マップ／詳細一覧</div></div>
+    </a>
+    {% for s in stores %}
+    <a class="cardlink" href="/s/{{ s.id }}/{{ s.token }}">
+      <span class="num">{{ s.code }}</span><div><div class="nm">{{ s.name }}</div></div>
+    </a>
+    {% endfor %}
+  </div>
+  <p class="note">番号は認識コード（端末ごとに初回1回だけ入力／約60日記憶）。本部は 0。</p>
+</div></body></html>

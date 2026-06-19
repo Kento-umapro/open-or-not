@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="{{ store.name }}">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="stylesheet" href="/static/style.css">
+<title>{{ store.name }}｜オープンチェック</title>
+</head>
+<body data-store="{{ store.id }}" data-token="{{ token }}" data-status="{{ status }}">
+<div class="wrap">
+
+  <div class="top">
+    <div class="store-name">{{ store.name }}</div>
+    <div class="date">{{ today }}</div>
+  </div>
+
+  {% if status == "unopened" %}
+    <div class="status unopened" id="statusBand">
+      <div class="label">本日のステータス</div>
+      <div class="state">未オープン</div>
+      <div class="sub">開店予定 {{ store.open_time }}</div>
+    </div>
+
+    {% if handover %}
+    <div class="handover-card">
+      <h3>前日からの引き継ぎ（{{ handover.date }}）</h3>
+      <div class="body">{{ handover.text }}</div>
+      <div class="from">※ 確認したらオープン報告へ</div>
+    </div>
+    {% endif %}
+
+    <div class="action" id="openAction">
+      <button class="btn btn-open" onclick="showSheet('open')">● オープン報告する</button>
+    </div>
+
+    <!-- open sheet -->
+    <div class="sheet" id="sheet-open" style="display:none">
+      <h2>オープン報告</h2>
+      <p class="hint">店内の状況がわかる写真を <span class="req">最低1枚</span>（複数OK）。問題がなくても必ず撮影してください。</p>
+      <div class="field">
+        <label>店内写真 <span class="req">必須</span></label>
+        <label class="shutter" for="open-photos">📷 写真を撮る / 選ぶ</label>
+        <input id="open-photos" type="file" accept="image/*" capture="environment" multiple hidden>
+        <div class="thumbs" id="open-thumbs"></div>
+      </div>
+      <div class="field">
+        <label>報告者（任意）</label>
+        <input type="text" id="open-reporter" placeholder="例）山田">
+      </div>
+      <div class="field">
+        <label>申し送り・気づき（任意）</label>
+        <textarea id="open-memo" placeholder="あれば記入（なければ空でOK）"></textarea>
+      </div>
+      <div class="row">
+        <button class="btn-ghost" onclick="hideSheet('open')">やめる</button>
+        <button class="btn btn-open btn-submit" id="open-submit" onclick="submit('open')" disabled>営業開始にする</button>
+      </div>
+    </div>
+
+  {% elif status == "open" %}
+    <div class="status open">
+      <div class="label">本日のステータス</div>
+      <div class="state">営業中</div>
+      <div class="sub">{{ opened_at }} オープン</div>
+    </div>
+
+    <div class="action">
+      <button class="btn btn-close" onclick="showSheet('close')">閉店報告する</button>
+    </div>
+
+    <!-- close sheet -->
+    <div class="sheet" id="sheet-close" style="display:none">
+      <h2>閉店報告</h2>
+      <p class="hint">閉店時の店内写真（任意）と、翌日への引き継ぎ事項を記入してください。</p>
+      <div class="field">
+        <label>閉店時の写真（任意・複数OK）</label>
+        <label class="shutter" for="close-photos">📷 写真を撮る / 選ぶ</label>
+        <input id="close-photos" type="file" accept="image/*" capture="environment" multiple hidden>
+        <div class="thumbs" id="close-thumbs"></div>
+      </div>
+      <div class="field">
+        <label>翌日への引き継ぎ事項</label>
+        <textarea id="close-handover" placeholder="翌朝オープンするスタッフに伝えること"></textarea>
+      </div>
+      <div class="field">
+        <label>報告者（任意）</label>
+        <input type="text" id="close-reporter" placeholder="例）田中">
+      </div>
+      <div class="row">
+        <button class="btn-ghost" onclick="hideSheet('close')">やめる</button>
+        <button class="btn btn-close btn-submit" onclick="submit('close')">閉店にする</button>
+      </div>
+    </div>
+
+  {% else %}
+    <div class="status closed">
+      <div class="label">本日のステータス</div>
+      <div class="state">閉店</div>
+      <div class="sub">{{ opened_at }} 〜 {{ closed_at }}</div>
+    </div>
+    <p class="done-note">本日の報告は完了しています。<br>お疲れさまでした。</p>
+  {% endif %}
+
+  <a href="/logout" onclick="return confirm('ログアウトしますか？\nトップに戻って別の店舗を選び直せます。')"
+     style="display:block;text-align:center;margin-top:34px;color:var(--ink-dim);font-size:13px;text-decoration:none">
+     ログアウト（別の店舗を選ぶ）</a>
+
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="spinner"></div>
+  <p id="overlay-text">送信中…</p>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
