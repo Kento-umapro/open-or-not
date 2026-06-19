@@ -153,6 +153,7 @@ def store_app(store_id: int, token: str, request: Request, db: Session = Depends
         "token": token,
         "status": status,
         "today": core.today_jst().strftime("%Y/%m/%d (%a)"),
+        "today_open": core.open_time_label(store),
         "opened_at": open_rep.opened_at.strftime("%H:%M") if open_rep else None,
         "closed_at": close_rep.closed_at.strftime("%H:%M") if close_rep else None,
         "handover": handover,
@@ -315,7 +316,7 @@ def admin_today(request: Request, db: Session = Depends(get_db)):
         out.append({
             "id": store.id,
             "name": store.name,
-            "open_time": store.open_time,
+            "open_time": core.open_time_label(store),
             "status": status,
             "overdue": status == "unopened" and core.is_overdue(store),
             "opened_at": open_rep.opened_at.strftime("%H:%M") if open_rep else None,
