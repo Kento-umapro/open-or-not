@@ -56,7 +56,7 @@ border-left:4px solid var(--line);border-radius:10px;padding:9px 10px}
 <script>
 const COL={open:"#2bd083",unopened:"#5a4a3a",overdue:"#e23b2e",closed:"#7d8a96"};
 const TXT={open:"営業中",unopened:"未オープン",overdue:"超過・未報告",closed:"閉店"};
-const nm=n=>n.replace("店","").replace("駅前","");
+const nm=n=>n;   // マップのピンはフル店名で表示（「店」も付ける）
 let MD=null;
 
 async function init(){

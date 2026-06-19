@@ -247,6 +247,30 @@ async def submit_close(
     return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
 
 
+@app.get("/s/{store_id}/{token}/api/today")
+def store_today_api(store_id: int, token: str, request: Request, db: Session = Depends(get_db)):
+    """店舗端末向けの全店ステータス（写真・引き継ぎ等の機微情報は含めない）。"""
+    store = db.get(Store, store_id)
+    if not store or token != store.token:
+        raise HTTPException(403, "権限がありません")
+    if not store_authed(request, store_id):
+        raise HTTPException(403, "ログインが必要です")
+    out = []
+    for s in db.query(Store).order_by(Store.id).all():
+        open_rep = core.get_today_open(db, s.id)
+        close_rep = core.get_today_close(db, s.id)
+        status = core.derive_status(open_rep, close_rep)
+        out.append({
+            "id": s.id,
+            "name": s.name,
+            "open_time": core.open_time_label(s),
+            "status": status,
+            "overdue": status == "unopened" and core.is_overdue(s),
+        })
+    return {"date": core.today_jst().strftime("%Y/%m/%d"),
+            "now": core.now_jst().strftime("%H:%M"), "stores": out}
+
+
 # ---------- HQ dashboard (本部・要パスワード) ----------
 @app.post("/admin/login")
 def admin_login(passcode: str = Form("")):

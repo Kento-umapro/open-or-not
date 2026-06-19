@@ -8,6 +8,29 @@
 <meta name="apple-mobile-web-app-title" content="{{ store.name }}">
 <link rel="manifest" href="/static/manifest.json">
 <link rel="stylesheet" href="/static/style.css">
+<style>
+  .allstatus{margin-top:30px;border-top:1px solid var(--line);padding-top:18px}
+  .allstatus h2{font-size:13px;letter-spacing:.12em;color:var(--ink-dim);margin:0 2px 10px;font-weight:700}
+  .ssMap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px}
+  .ssMap svg{width:100%;height:auto;display:block}
+  .ssLegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-dim);margin:8px 4px 2px}
+  .ssLegend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
+  .ssList{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .ssChip{display:flex;align-items:center;gap:9px;background:var(--panel-2);border:1px solid var(--line);
+          border-left:4px solid var(--line);border-radius:10px;padding:9px 10px}
+  .ssChip .nm{font-size:13px;font-weight:700;line-height:1.2}
+  .ssChip .tm{font-size:11px;color:var(--ink-dim);margin-top:1px}
+  .ssChip.s-open{border-left-color:var(--green)}
+  .ssChip.s-unopened{border-left-color:#5a4a3a;opacity:.72}
+  .ssChip.s-overdue{border-left-color:var(--red);background:#2a1512}
+  .ssChip.s-closed{border-left-color:var(--slate)}
+  .ssChip .led{width:11px;height:11px;border-radius:50%;flex:none}
+  .ssChip.s-open .led{background:#2bd083;box-shadow:0 0 9px 1px rgba(43,208,131,.7)}
+  .ssChip.s-unopened .led{background:#5a4a3a}
+  .ssChip.s-overdue .led{background:#e23b2e;box-shadow:0 0 9px 1px rgba(226,59,46,.8)}
+  .ssChip.s-closed .led{background:#7d8a96}
+  .pulse{animation:pl 1.3s ease-in-out infinite}@keyframes pl{50%{opacity:.5}}
+</style>
 <title>{{ store.name }}｜オープンチェック</title>
 </head>
 <body data-store="{{ store.id }}" data-token="{{ token }}" data-status="{{ status }}">
@@ -105,6 +128,18 @@
     <p class="done-note">本日の報告は完了しています。<br>お疲れさまでした。</p>
   {% endif %}
 
+  <div class="allstatus">
+    <h2>全店の状況 <span id="ssClock" style="font-weight:400"></span></h2>
+    <div class="ssMap" id="ssMap"></div>
+    <div class="ssLegend">
+      <span><i style="background:#2bd083"></i>営業中</span>
+      <span><i style="background:#5a4a3a"></i>未オープン</span>
+      <span><i style="background:#e23b2e"></i>超過</span>
+      <span><i style="background:#7d8a96"></i>閉店</span>
+    </div>
+    <div class="ssList" id="ssList"></div>
+  </div>
+
   <a href="/logout" onclick="return confirm('ログアウトしますか？\nトップに戻って別の店舗を選び直せます。')"
      style="display:block;text-align:center;margin-top:34px;color:var(--ink-dim);font-size:13px;text-decoration:none">
      ログアウト（別の店舗を選ぶ）</a>
@@ -117,5 +152,59 @@
 </div>
 
 <script src="/static/app.js"></script>
+<script>
+// ── 全店マップ＋状況（店舗端末用・写真等は出さない軽量表示） ──
+(function(){
+  const SID=document.body.dataset.store, TOK=document.body.dataset.token;
+  const COL={open:"#2bd083",unopened:"#5a4a3a",overdue:"#e23b2e",closed:"#7d8a96"};
+  const TXT={open:"営業中",unopened:"未オープン",overdue:"超過・未報告",closed:"閉店"};
+  const eff=s=>(s.status==="unopened"&&s.overdue)?"overdue":s.status;
+  let MD=null;
+
+  function drawMap(stat){
+    const W=MD.W,H=MD.H, ALLN=Object.keys(MD.stores);
+    let s=`<svg viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#15110d"/>`;
+    MD.paths.forEach(p=>s+=`<path d="${p}" fill="#3a2e22" stroke="#52412f" stroke-width="0.5"/>`);
+    ALLN.forEach(n=>{
+      const [x,y]=MD.stores[n]; const st=stat[n]||"unopened"; const c=COL[st];
+      const glow=(st==="open"||st==="overdue");
+      if(MD.anchors && MD.anchors[n]){
+        const [ax,ay]=MD.anchors[n]; const side=MD.anchorSide[n]; const tx=ax+(side==="start"?16:-16);
+        s+=`<g><circle cx="${x}" cy="${y}" r="4" fill="${c}"/>`
+          +`<line x1="${x}" y1="${y}" x2="${ax}" y2="${ay}" stroke="#52412f" stroke-width="1.3"/>`
+          +(glow?`<circle cx="${ax}" cy="${ay}" r="28" fill="${c}" opacity="${st==='overdue'?0.28:0.2}" class="${st==='overdue'?'pulse':''}"/>`:"")
+          +`<circle cx="${ax}" cy="${ay}" r="11" fill="${c}" stroke="#15110d" stroke-width="2.5"/>`
+          +`<text x="${tx}" y="${ay+6}" text-anchor="${side}" font-size="22" font-weight="700" fill="#f7efe6" paint-order="stroke" stroke="#15110d" stroke-width="4">${n}</text></g>`;
+      } else {
+        const [dx,dy,a]=(MD.labels[n]||[14,5,"start"]); const tf=st==="unopened"?"#b8a795":"#f7efe6";
+        s+=`<g>`+(glow?`<circle cx="${x}" cy="${y}" r="28" fill="${c}" opacity="${st==='overdue'?0.28:0.2}" class="${st==='overdue'?'pulse':''}"/>`:"")
+          +`<circle cx="${x}" cy="${y}" r="11" fill="${c}" stroke="#15110d" stroke-width="2.5"/>`
+          +`<text x="${x+dx}" y="${y+dy}" text-anchor="${a}" font-size="22" font-weight="700" fill="${tf}" paint-order="stroke" stroke="#15110d" stroke-width="4">${n}</text></g>`;
+      }
+    });
+    s+=`</svg>`;
+    document.getElementById("ssMap").innerHTML=s;
+  }
+
+  async function tick(){
+    try{
+      const d=await (await fetch(`/s/${SID}/${TOK}/api/today`)).json();
+      const stat={}; d.stores.forEach(s=>stat[s.name]=eff(s));
+      drawMap(stat);
+      document.getElementById("ssList").innerHTML=d.stores.map(s=>{
+        const st=eff(s);
+        return `<div class="ssChip s-${st}"><span class="led"></span><div><div class="nm">${s.name}</div><div class="tm">${TXT[st]}</div></div></div>`;
+      }).join("");
+      document.getElementById("ssClock").textContent="（"+d.now+" 時点）";
+    }catch(e){ /* ネット不調時は無視 */ }
+  }
+
+  async function init(){
+    try{ MD=await (await fetch("/static/mapdata.json")).json(); }catch(e){ return; }
+    tick(); setInterval(tick, 180000);
+  }
+  init();
+})();
+</script>
 </body>
 </html>
