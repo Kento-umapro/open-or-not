@@ -19,7 +19,7 @@ from .models import Store, OpenReport, CloseReport
 from . import core
 from .seed import seed_if_empty
 from .cloudinary_client import upload_image, cloudinary_enabled
-from .line_client import line_enabled, push_detail
+from .line_client import line_enabled, push_detail, mode_label
 
 BASE_DIR = os.path.dirname(__file__)
 app = FastAPI(title="どてっぱん オープンチェック")
@@ -81,7 +81,7 @@ def startup():
                       replace_existing=True)
     scheduler.start()
     print(f"Cloudinary: {'ON' if cloudinary_enabled() else 'local fallback'} | "
-          f"LINE alert: {'ON' if line_enabled() else 'OFF'}")
+          f"LINE alert: {mode_label()}")
 
 
 @app.on_event("shutdown")
