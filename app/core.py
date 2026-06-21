@@ -110,6 +110,23 @@ def get_latest_handover(db, store_id: int):
     )
 
 
+def get_carryover_handover(db, store_id: int):
+    """前営業日（＝business_date-1日）の閉店報告の引き継ぎだけを返す。
+    翌日だけ「前日からの引き継ぎ」として表示し、2日後以降には出さない。"""
+    prev = business_date() - timedelta(days=1)
+    return (
+        db.query(CloseReport)
+        .filter(
+            CloseReport.store_id == store_id,
+            CloseReport.handover != None,          # noqa: E711
+            CloseReport.handover != "",
+            CloseReport.report_date == prev,
+        )
+        .order_by(CloseReport.closed_at.desc())
+        .first()
+    )
+
+
 def derive_status(open_rep, close_rep) -> str:
     if close_rep:
         return "closed"      # 閉店

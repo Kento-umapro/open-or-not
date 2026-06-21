@@ -139,12 +139,12 @@ def store_app(store_id: int, token: str, request: Request, db: Session = Depends
     close_rep = core.get_today_close(db, store_id)
     status = core.derive_status(open_rep, close_rep)
     handover = None
-    if status == "unopened":
-        latest = core.get_latest_handover(db, store_id)
+    if status != "closed":
+        latest = core.get_carryover_handover(db, store_id)
         if latest:
             handover = {
                 "text": latest.handover,
-                "date": latest.closed_at.strftime("%m/%d"),
+                "date": latest.report_date.strftime("%m/%d"),
                 "photos": latest.photos,
             }
     ctx = {
@@ -337,6 +337,7 @@ def admin_today(request: Request, db: Session = Depends(get_db)):
         open_rep = core.get_today_open(db, store.id)
         close_rep = core.get_today_close(db, store.id)
         status = core.derive_status(open_rep, close_rep)
+        carry = core.get_carryover_handover(db, store.id)
         out.append({
             "id": store.id,
             "name": store.name,
@@ -348,6 +349,8 @@ def admin_today(request: Request, db: Session = Depends(get_db)):
             "open_photos": open_rep.photos if open_rep else [],
             "memo": open_rep.memo if open_rep else None,
             "handover": close_rep.handover if close_rep else None,
+            "carryover_handover": ({"text": carry.handover, "date": carry.report_date.strftime("%m/%d")}
+                                   if carry else None),
             "close_photos": close_rep.photos if close_rep else [],
         })
     return {"date": core.business_date().strftime("%Y/%m/%d"), "now": core.now_jst().strftime("%H:%M"), "stores": out}
