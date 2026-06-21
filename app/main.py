@@ -19,7 +19,7 @@ from .models import Store, OpenReport, CloseReport
 from . import core
 from .seed import seed_if_empty
 from .cloudinary_client import upload_image, cloudinary_enabled
-from .line_client import line_enabled, push_detail, mode_label
+from .line_client import line_enabled, push_detail, mode_label, push_text
 
 BASE_DIR = os.path.dirname(__file__)
 app = FastAPI(title="どてっぱん オープンチェック")
@@ -210,6 +210,10 @@ async def submit_open(
     )
     db.add(rep)
     db.commit()
+    # オープン報告が来たことを通知（NOTIFY_ON_OPEN=0 で無効化可能）
+    if os.getenv("NOTIFY_ON_OPEN", "1").strip().lower() not in ("0", "false", "no", "off"):
+        store = db.get(Store, store_id)
+        push_text(f"🟢 オープン報告\n{store.name} がオープンしました（{rep.opened_at.strftime('%H:%M')}）")
     return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
 
 
