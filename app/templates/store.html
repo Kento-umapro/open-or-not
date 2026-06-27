@@ -94,11 +94,6 @@
     <div class="action">
       <button class="btn btn-close" onclick="showSheet('close')">閉店報告する</button>
     </div>
-    <div style="text-align:center;margin-top:12px">
-      <a href="javascript:void(0)" onclick="undo('open')"
-         style="color:var(--ink-dim);font-size:13px;text-decoration:none">
-        オープン報告を取り消す（未報告に戻す）</a>
-    </div>
 
     <!-- close sheet -->
     <div class="sheet" id="sheet-close" style="display:none">
@@ -131,11 +126,6 @@
       <div class="sub">{{ opened_at }} 〜 {{ closed_at }}</div>
     </div>
     <p class="done-note">本日の報告は完了しています。<br>お疲れさまでした。</p>
-    <div class="action" style="margin-top:18px">
-      <button class="btn btn-open" onclick="undo('close')">閉店報告を取り消す（営業中に戻す）</button>
-    </div>
-    <p class="done-note" style="font-size:12px;opacity:.7;margin-top:10px">
-      ※ 間違えて閉店報告した場合はこちら（前の状態に戻ります）</p>
   {% endif %}
 
   <div class="allstatus">

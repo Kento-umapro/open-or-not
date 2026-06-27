@@ -13,8 +13,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
-from starlette.exceptions import HTTPException as StarletteHTTPException
-import traceback
 
 from .database import Base, engine, get_db, SessionLocal
 from .models import Store, OpenReport, CloseReport
@@ -22,47 +20,12 @@ from . import core
 from .seed import seed_if_empty
 from .cloudinary_client import upload_image, cloudinary_enabled
 from .line_client import line_enabled, push_detail, mode_label, push_text
+from .notify import notify_alert, send_make_email, make_enabled, channel_label, recipients
 
 BASE_DIR = os.path.dirname(__file__)
 app = FastAPI(title="どてっぱん オープンチェック")
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-
-
-# ---------- エラー時は「トップに戻れる」画面を出す ----------
-def _wants_html(request: Request) -> bool:
-    """ブラウザの画面遷移(GET)は Accept に text/html を含む。
-    JS の fetch（API/送信）は */* なので、こちらは従来どおり JSON を返す。"""
-    return "text/html" in request.headers.get("accept", "")
-
-
-@app.exception_handler(StarletteHTTPException)
-async def _http_exception_handler(request: Request, exc: StarletteHTTPException):
-    if _wants_html(request):
-        return templates.TemplateResponse(
-            "error.html",
-            {"request": request, "code": exc.status_code,
-             "message": exc.detail or "ページを表示できませんでした。"},
-            status_code=exc.status_code,
-        )
-    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
-
-
-@app.exception_handler(Exception)
-async def _unhandled_exception_handler(request: Request, exc: Exception):
-    traceback.print_exc()  # サーバーログに残す
-    if _wants_html(request):
-        return templates.TemplateResponse(
-            "error.html",
-            {"request": request, "code": 500,
-             "message": "予期しないエラーが発生しました。"},
-            status_code=500,
-        )
-    return JSONResponse(
-        {"detail": "サーバーでエラーが発生しました。もう一度お試しください。"},
-        status_code=500,
-    )
-
 
 scheduler = BackgroundScheduler(timezone="Asia/Tokyo")
 
@@ -119,7 +82,7 @@ def startup():
                       replace_existing=True)
     scheduler.start()
     print(f"Cloudinary: {'ON' if cloudinary_enabled() else 'local fallback'} | "
-          f"LINE alert: {mode_label()}")
+          f"LINE: {mode_label()} | Alert channel: {channel_label()}")
 
 
 @app.on_event("shutdown")
@@ -251,7 +214,11 @@ async def submit_open(
     # オープン報告が来たことを通知（NOTIFY_ON_OPEN=0 で無効化可能）
     if os.getenv("NOTIFY_ON_OPEN", "1").strip().lower() not in ("0", "false", "no", "off"):
         store = db.get(Store, store_id)
-        push_text(f"🟢 オープン報告\n{store.name} がオープンしました（{rep.opened_at.strftime('%H:%M')}）")
+        ot = rep.opened_at.strftime('%H:%M')
+        notify_alert(
+            f"【オープン】{store.name}（{ot}）",
+            f"🟢 オープン報告\n{store.name} がオープンしました（{ot}）"
+        )
     return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
 
 
@@ -286,35 +253,6 @@ async def submit_close(
     )
     db.add(rep)
     db.commit()
-    return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
-
-
-# ---------- ステータスの取り消し（間違えた報告を戻す） ----------
-@app.post("/s/{store_id}/{token}/undo-close")
-def undo_close(store_id: int, token: str, request: Request, db: Session = Depends(get_db)):
-    """間違えた閉店報告を取り消して、前の状態（営業中／未報告）に戻す。"""
-    _require_store(db, store_id, token)
-    if not store_authed(request, store_id):
-        raise HTTPException(403, "ログインが必要です")
-    rep = core.get_today_close(db, store_id)
-    if rep:
-        db.delete(rep)
-        db.commit()
-    return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
-
-
-@app.post("/s/{store_id}/{token}/undo-open")
-def undo_open(store_id: int, token: str, request: Request, db: Session = Depends(get_db)):
-    """間違えたオープン報告を取り消して「未報告」に戻す。"""
-    _require_store(db, store_id, token)
-    if not store_authed(request, store_id):
-        raise HTTPException(403, "ログインが必要です")
-    if core.get_today_close(db, store_id):
-        raise HTTPException(400, "先に閉店報告を取り消してください。")
-    rep = core.get_today_open(db, store_id)
-    if rep:
-        db.delete(rep)
-        db.commit()
     return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
 
 
@@ -445,10 +383,29 @@ def admin_test_line(request: Request):
     })
 
 
+@app.get("/admin/test-mail")
+def admin_test_mail(request: Request):
+    """Make.com Webhook 経由でテストメールを送り、結果を返す。"""
+    if not admin_authed(request):
+        raise HTTPException(403, "本部ログインが必要です")
+    ok, detail = send_make_email(
+        "【テスト】どてっぱん オープンチェック 通知テスト",
+        f"これはテスト通知です。届いていればメール経路はOKです。\n"
+        f"（{core.now_jst().strftime('%m/%d %H:%M')}）"
+    )
+    return JSONResponse({
+        "make_enabled": make_enabled(),
+        "recipients": recipients(),
+        "sent": ok,
+        "detail": detail,
+        "hint": "sent=true でメールが届けばOK。届かない場合は迷惑メールも確認。falseなら detail と MAKE_WEBHOOK_URL を確認。",
+    })
+
+
 @app.get("/admin/run-check")
 def admin_run_check(request: Request):
     """未オープンチェックを今すぐ強制実行（当日アラート済み・深夜カットオフを無視）。
-    今まさに開店時刻を過ぎて未報告の店があれば、即LINE送信して結果を返す。"""
+    今まさに開店時刻を過ぎて未報告の店があれば、即送信して結果を返す。"""
     if not admin_authed(request):
         raise HTTPException(403, "本部ログインが必要です")
     summary = core.check_unopened(force=True)

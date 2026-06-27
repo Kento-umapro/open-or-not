@@ -75,26 +75,6 @@ async function submit(kind) {
   }
 }
 
-// 間違えた報告を取り消す（閉店→前の状態 / オープン→未報告）
-async function undo(kind) {
-  const msg = kind === "close"
-    ? "閉店報告を取り消して、前の状態（営業中／未報告）に戻します。よろしいですか？"
-    : "オープン報告を取り消して『未報告』に戻します。よろしいですか？";
-  if (!confirm(msg)) return;
-  const overlay = document.getElementById("overlay");
-  document.getElementById("overlay-text").textContent = "取り消し中…";
-  overlay.classList.add("show");
-  try {
-    const res = await fetch(`/s/${storeId}/${token}/undo-${kind}`, { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "取り消しに失敗しました");
-    window.location.href = data.redirect || `/s/${storeId}/${token}`;
-  } catch (e) {
-    overlay.classList.remove("show");
-    alert(e.message + "\n通信状況を確認して、もう一度お試しください。");
-  }
-}
-
 function val(id) {
   const el = document.getElementById(id);
   return el ? el.value : "";

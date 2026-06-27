@@ -6,6 +6,7 @@ import jpholiday
 from .database import SessionLocal
 from .models import Store, OpenReport, CloseReport
 from .line_client import push_text, line_enabled
+from .notify import notify_alert, channel_label
 
 JST = ZoneInfo("Asia/Tokyo")
 GRACE_MINUTES = 0           # 0=開店時刻ちょうどで判定（猶予なし・ジャストタイム）
@@ -156,7 +157,7 @@ def check_unopened(force: bool = False):
     force=True で「当日アラート済み」「深夜カットオフ」を無視して即実行（テスト用）。
     結果サマリを返す。"""
     db = SessionLocal()
-    summary = {"now": "", "line": line_enabled(),
+    summary = {"now": "", "channel": channel_label(),
                "overdue": [], "sent": [], "failed": [], "skipped_cutoff": False}
     try:
         n = now_jst()
@@ -176,7 +177,8 @@ def check_unopened(force: bool = False):
                 continue
             summary["overdue"].append(store.name)
             ot = todays_open_time(store, td) or ""
-            ok = push_text(
+            ok = notify_alert(
+                f"【未オープン】{store.name}（開店 {ot}）",
                 f"🔴 未オープンアラート\n{store.name} が開店時刻 {ot} になりましたが、"
                 f"まだオープン報告がありません。\n（{n.strftime('%m/%d %H:%M')} 時点）"
             )
