@@ -256,6 +256,48 @@ async def submit_close(
     return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
 
 
+@app.post("/s/{store_id}/{token}/undo-close")
+def undo_close(store_id: int, token: str, request: Request, db: Session = Depends(get_db)):
+    """間違って閉店報告した時に取り消す（本日分の閉店報告を削除→営業中に戻す）。"""
+    _require_store(db, store_id, token)
+    if not store_authed(request, store_id):
+        raise HTTPException(403, "ログインが必要です")
+    rep = core.get_today_close(db, store_id)
+    if rep:
+        db.delete(rep)
+        db.commit()
+    return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
+
+
+@app.post("/s/{store_id}/{token}/undo-open")
+def undo_open(store_id: int, token: str, request: Request, db: Session = Depends(get_db)):
+    """間違ってオープン報告した時に取り消す（本日分のオープン報告を削除→未報告に戻す）。
+    既に閉店済みの場合は取り消せない（先に閉店を取り消してから）。"""
+    _require_store(db, store_id, token)
+    if not store_authed(request, store_id):
+        raise HTTPException(403, "ログインが必要です")
+    if core.get_today_close(db, store_id):
+        raise HTTPException(400, "先に閉店を取り消してください")
+    rep = core.get_today_open(db, store_id)
+    if rep:
+        db.delete(rep)
+        db.commit()
+    return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
+
+
+@app.post("/s/{store_id}/{token}/set-status")
+def set_status_store(store_id: int, token: str, request: Request,
+                     status: str = Form(...), db: Session = Depends(get_db)):
+    """店舗端末から本日のステータスを直接変更する（押し間違いの修正用）。"""
+    _require_store(db, store_id, token)
+    if not store_authed(request, store_id):
+        raise HTTPException(403, "ログインが必要です")
+    if status not in ("unopened", "open", "closed"):
+        raise HTTPException(400, "不正なステータスです")
+    core.set_status(db, store_id, status)
+    return {"ok": True, "redirect": f"/s/{store_id}/{token}"}
+
+
 @app.get("/s/{store_id}/{token}/api/today")
 def store_today_api(store_id: int, token: str, request: Request, db: Session = Depends(get_db)):
     """店舗端末向けの全店ステータス（写真・引き継ぎ等の機微情報は含めない）。"""
@@ -363,6 +405,21 @@ def admin_today(request: Request, db: Session = Depends(get_db)):
             "close_photos": close_rep.photos if close_rep else [],
         })
     return {"date": core.business_date().strftime("%Y/%m/%d"), "now": core.now_jst().strftime("%H:%M"), "stores": out}
+
+
+@app.post("/admin/store/{store_id}/set-status")
+def set_status_admin(store_id: int, request: Request,
+                     status: str = Form(...), db: Session = Depends(get_db)):
+    """本部（コード0）が任意の店舗の本日ステータスを変更する。"""
+    if not admin_authed(request):
+        raise HTTPException(403, "本部ログインが必要です")
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(404, "店舗が見つかりません")
+    if status not in ("unopened", "open", "closed"):
+        raise HTTPException(400, "不正なステータスです")
+    core.set_status(db, store_id, status)
+    return {"ok": True}
 
 
 # ---------- 診断用（本部・要ログイン） ----------

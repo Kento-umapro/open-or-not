@@ -28,6 +28,11 @@
   .ho{margin-top:9px;font-size:13px;color:var(--ink);background:var(--panel-2);border-radius:8px;padding:8px;white-space:pre-wrap;line-height:1.5}
   .ho.carry{border-left:3px solid #e2a23b;background:#2a2114;color:#f0e2c8}
   .legend{color:var(--ink-dim);font-size:13px;margin-top:14px}
+  .setrow{display:flex;gap:6px;margin-top:11px;border-top:1px dashed var(--line);padding-top:10px}
+  .setbtn{flex:1;padding:9px 4px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid var(--line);background:var(--panel-2);color:var(--ink)}
+  .setbtn:disabled{opacity:.4;cursor:default;background:var(--panel)}
+  .setbtn:active:not(:disabled){background:#2a2118}
+  .setlbl{font-size:11px;color:var(--ink-dim);margin-top:10px;letter-spacing:.04em}
 </style>
 </head>
 <body>
@@ -64,6 +69,11 @@ async function load(){
     const memo = s.memo ? `<div class="ho">📝 ${escapeHtml(s.memo)}</div>` : "";
     const carry = (!s.handover && s.carryover_handover)
       ? `<div class="ho carry">📋 前日からの引き継ぎ（${s.carryover_handover.date}）<br>${escapeHtml(s.carryover_handover.text)}</div>` : "";
+    const setrow = `<div class="setlbl">ステータス変更</div><div class="setrow">
+        <button class="setbtn" ${s.status==='unopened'?'disabled':''} onclick="adminSet(${s.id},'unopened',this)">未報告</button>
+        <button class="setbtn" ${s.status==='open'?'disabled':''} onclick="adminSet(${s.id},'open',this)">営業中</button>
+        <button class="setbtn" ${s.status==='closed'?'disabled':''} onclick="adminSet(${s.id},'closed',this)">閉店</button>
+      </div>`;
     grid.insertAdjacentHTML("beforeend", `
       <div class="card ${cls}">
         <div class="nm">${escapeHtml(s.name)}</div>
@@ -71,10 +81,24 @@ async function load(){
         <div class="meta">${meta}</div>
         ${ph?`<div class="ph">${ph}</div>`:""}
         ${memo}${ho}${carry}
+        ${setrow}
       </div>`);
   }
 }
 function escapeHtml(t){return (t||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+async function adminSet(id, status, btn){
+  const L={unopened:"未報告",open:"営業中",closed:"閉店"};
+  if(!confirm(L[status]+"に変更しますか？")) return;
+  const row = btn.parentElement;
+  row.querySelectorAll("button").forEach(b=>b.disabled=true);
+  try{
+    const fd=new FormData(); fd.append("status",status);
+    const r=await fetch(`/admin/store/${id}/set-status`,{method:"POST",body:fd});
+    if(!r.ok){ const d=await r.json().catch(()=>({})); throw new Error(d.detail||"変更に失敗しました"); }
+    await load();
+  }catch(e){ alert(e.message); await load(); }
+}
 load();
 setInterval(load, 60000);
 </script>

@@ -30,15 +30,48 @@
   .ssChip.s-overdue .led{background:#e23b2e;box-shadow:0 0 9px 1px rgba(226,59,46,.8)}
   .ssChip.s-closed .led{background:#7d8a96}
   .pulse{animation:pl 1.3s ease-in-out infinite}@keyframes pl{50%{opacity:.5}}
+  .undo-row{text-align:center;margin-top:16px}
+  .undo-link{background:none;border:none;color:#b8a795;font-size:13px;text-decoration:underline;cursor:pointer;padding:8px}
+  .undo-link:active{color:#f7efe6}
+  .errbox{background:#3a1512;border:1px solid #e23b2e;border-radius:12px;padding:14px;margin:14px 0}
+  .errtext{color:#ffd9d4;font-size:14px;line-height:1.55;margin-bottom:10px;white-space:pre-wrap}
+  .errbtns{display:flex;gap:10px}
+  .errbtns button{flex:1;padding:11px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer}
+  .btn-home{background:#e2502e;color:#fff;border:none}
+  .homebar{display:flex;justify-content:flex-start;padding:4px 2px 0}
+  .homelink{color:var(--ink-dim);font-size:13px;text-decoration:none;padding:6px 2px}
+  .homelink:active{color:var(--ink)}
+  .statuschg{margin-top:22px}
+  .statuschg details{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:2px 14px}
+  .statuschg summary{cursor:pointer;padding:13px 2px;font-size:14px;font-weight:700;color:var(--ink-dim);list-style:none}
+  .statuschg summary::-webkit-details-marker{display:none}
+  .schint{font-size:12px;color:var(--ink-dim);margin:2px 2px 12px;line-height:1.5}
+  .schbtns{display:flex;flex-direction:column;gap:8px;padding-bottom:14px}
+  .schbtn{padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);text-align:left}
+  .schbtn.s-unopened{border-left:4px solid var(--ember)}
+  .schbtn.s-open{border-left:4px solid var(--green)}
+  .schbtn.s-closed{border-left:4px solid var(--slate)}
+  .schbtn:disabled{opacity:.42;cursor:default}
+  .schbtn:active:not(:disabled){background:#2a2118}
 </style>
 <title>{{ store.name }}｜オープンチェック</title>
 </head>
 <body data-store="{{ store.id }}" data-token="{{ token }}" data-status="{{ status }}">
 <div class="wrap">
 
+  <div class="homebar"><a href="/" class="homelink">← トップに戻る</a></div>
+
   <div class="top">
     <div class="store-name">{{ store.name }}</div>
     <div class="date">{{ today }}</div>
+  </div>
+
+  <div id="errBox" class="errbox" style="display:none">
+    <div id="errText" class="errtext"></div>
+    <div class="errbtns">
+      <button class="btn-ghost" onclick="hideErr()">閉じる／もう一度</button>
+      <button class="btn-home" onclick="location.href='/'">トップに戻る</button>
+    </div>
   </div>
 
   {% if status == "unopened" %}
@@ -128,6 +161,18 @@
     <p class="done-note">本日の報告は完了しています。<br>お疲れさまでした。</p>
   {% endif %}
 
+  <div class="statuschg">
+    <details>
+      <summary>⚙️ ステータスを手動で変更する</summary>
+      <p class="schint">押し間違えたとき（例：オープン報告のあとに誤って閉店報告した等）に、本日のステータスを直接切り替えます。</p>
+      <div class="schbtns">
+        <button class="schbtn s-unopened" onclick="setStatus('unopened')" {% if status=="unopened" %}disabled{% endif %}>未報告にする{% if status=="unopened" %}（現在）{% endif %}</button>
+        <button class="schbtn s-open" onclick="setStatus('open')" {% if status=="open" %}disabled{% endif %}>営業中にする{% if status=="open" %}（現在）{% endif %}</button>
+        <button class="schbtn s-closed" onclick="setStatus('closed')" {% if status=="closed" %}disabled{% endif %}>閉店にする{% if status=="closed" %}（現在）{% endif %}</button>
+      </div>
+    </details>
+  </div>
+
   <div class="allstatus">
     <h2>全店の状況 <span id="ssClock" style="font-weight:400"></span></h2>
     <div class="ssMap" id="ssMap"></div>
@@ -149,6 +194,7 @@
 <div class="overlay" id="overlay">
   <div class="spinner"></div>
   <p id="overlay-text">送信中…</p>
+  <button id="overlay-home" class="btn-home" style="display:none;margin-top:18px;padding:11px 22px;border-radius:9px;font-weight:700" onclick="location.href='/'">トップに戻る</button>
 </div>
 
 <script src="/static/app.js"></script>

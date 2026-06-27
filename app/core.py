@@ -136,6 +136,46 @@ def derive_status(open_rep, close_rep) -> str:
     return "unopened"        # 未オープン
 
 
+def set_status(db, store_id: int, status: str):
+    """本日(business_date)のステータスを手動で直接セットする。
+    押し間違いの修正や、本部からの一括修正に使う。status は
+    "unopened" / "open" / "closed"。本日分のオープン/閉店報告を
+    作成・削除して目的のステータスに合わせる。通知は送らない（純粋な修正）。
+    手動で作る報告は reporter="手動変更"・写真なしで記録する。"""
+    if status not in ("unopened", "open", "closed"):
+        raise ValueError("invalid status")
+    bd = business_date()
+    now = now_jst().replace(tzinfo=None)
+    open_rep = get_today_open(db, store_id)
+    close_rep = get_today_close(db, store_id)
+
+    if status == "unopened":
+        if close_rep:
+            db.delete(close_rep)
+        if open_rep:
+            db.delete(open_rep)
+    elif status == "open":
+        if close_rep:
+            db.delete(close_rep)
+        if not open_rep:
+            db.add(OpenReport(
+                store_id=store_id, report_date=bd, opened_at=now,
+                reporter="手動変更", memo=None, photos_json="[]",
+            ))
+    elif status == "closed":
+        if not open_rep:
+            db.add(OpenReport(
+                store_id=store_id, report_date=bd, opened_at=now,
+                reporter="手動変更", memo=None, photos_json="[]",
+            ))
+        if not close_rep:
+            db.add(CloseReport(
+                store_id=store_id, report_date=bd, closed_at=now,
+                reporter="手動変更", handover=None, photos_json="[]",
+            ))
+    db.commit()
+
+
 def is_overdue(store: Store, d: date = None) -> bool:
     """その日の開店時刻＋猶予を過ぎているか（まだ未オープンの店の判定用）。
     休業日や開店前は False。"""
